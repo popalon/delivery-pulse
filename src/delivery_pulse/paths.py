@@ -15,6 +15,7 @@ class ProjectPaths:
     data_metadata: Path
     notebooks: Path
     reports_figures: Path
+    reports_quality: Path
     sql: Path
 
     def local_directories(self) -> tuple[Path, ...]:
@@ -26,6 +27,7 @@ class ProjectPaths:
             self.data_metadata,
             self.notebooks,
             self.reports_figures,
+            self.reports_quality,
             self.sql,
         )
 
@@ -47,6 +49,7 @@ def get_project_paths(project_root: Path | None = None) -> ProjectPaths:
         data_metadata=data / "metadata",
         notebooks=root / "notebooks",
         reports_figures=root / "reports" / "figures",
+        reports_quality=root / "reports" / "quality",
         sql=root / "sql",
     )
 

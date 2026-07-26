@@ -18,6 +18,8 @@ from delivery_pulse.paths import (
     create_local_directories,
     get_project_paths,
 )
+from delivery_pulse.quality import QualityRunError, run_quality
+from delivery_pulse.quality.pipeline import should_fail
 
 
 def _add_root_argument(parser: argparse.ArgumentParser) -> None:
@@ -66,6 +68,26 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
     )
     generate_parser.add_argument("--force", action="store_true")
+
+    quality_parser = subparsers.add_parser(
+        "quality",
+        help="Validate raw CSV files and create quality reports.",
+    )
+    quality_parser.add_argument("--input-dir", type=Path, default=None)
+    quality_parser.add_argument("--output-dir", type=Path, default=None)
+    quality_parser.add_argument(
+        "--format",
+        dest="profile_format",
+        choices=["csv", "json"],
+        default="csv",
+        help="Table profile format; canonical reports are always created.",
+    )
+    quality_parser.add_argument(
+        "--fail-on",
+        choices=["critical", "error", "warning"],
+        default="error",
+    )
+    quality_parser.add_argument("--max-samples", type=int, default=5)
     return parser
 
 
@@ -117,6 +139,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         for table_name, row_count in row_counts.items():
             print(f"  {table_name}: {row_count}")
         return 0
+
+    if args.command == "quality":
+        project_paths = get_project_paths()
+        input_dir = args.input_dir or project_paths.data_raw
+        output_dir = args.output_dir or project_paths.reports_quality
+        try:
+            report, _, report_paths = run_quality(
+                input_dir,
+                output_dir,
+                max_samples=args.max_samples,
+                profile_format=args.profile_format,
+            )
+            failed = should_fail(report, args.fail_on)
+        except QualityRunError as error:
+            print(f"Quality run failed to start: {error}", file=sys.stderr)
+            return 2
+        print(f"Quality status: {report.status.value}")
+        print(
+            "Findings: "
+            f"critical={report.critical_count}, "
+            f"error={report.error_count}, "
+            f"warning={report.warning_count}, "
+            f"info={report.info_count}"
+        )
+        print(f"Report: {report_paths['markdown']}")
+        return 1 if failed else 0
 
     raise AssertionError(f"Unsupported command: {args.command}")
 
