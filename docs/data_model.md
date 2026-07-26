@@ -230,8 +230,9 @@ vehicles 1 ─── 0..N maintenance
 - `actual_delivery_at >= actual_departure_at`;
 - статус `delivered` требует оба фактических времени и фактическое расстояние;
 - незавершённые статусы не должны иметь `actual_delivery_at`;
-- масса заказа не превышает `vehicles.capacity_kg`, кроме специально
-  маркированных дефектов качества.
+- масса заказа обычно не превышает `vehicles.capacity_kg`; редкие реальные
+  операционные перегрузы ограничены 5%, остаются в аналитической выборке и
+  отличаются от искусственных дефектов качества.
 
 ### Полнота финансовых данных
 
@@ -371,14 +372,15 @@ vehicles 1 ─── 0..N maintenance
 `capacity_utilization > 1`. Такая строка остаётся в аналитической выборке.
 
 Искусственный дефект качества — намеренно испорченное значение только для
-проверок data quality. Будущий генератор записывает реестр таких дефектов в:
+проверок data quality. Генератор записывает реестр таких дефектов в:
 
 ```text
-data/raw/_technical/quality_issue_manifest.json
+data/metadata/quality_issues_manifest.csv
 ```
 
-Запись manifest содержит минимум `issue_id`, `seed`, `table_name`, `record_id`,
-`column_name`, `issue_type`, `expected_rule` и `expected_severity`. Manifest:
+Запись manifest содержит минимум `table_name`, `record_id`, `field_name`,
+`issue_type`, `expected_detection` и `description`. Seed и параметры запуска
+хранятся рядом в `data/metadata/metadata.json`. Manifest:
 
 - используется тестами для проверки обнаружения известных дефектов;
 - не загружается в DuckDB-витрины и не читается аналитическим кодом;

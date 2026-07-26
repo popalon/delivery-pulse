@@ -5,10 +5,14 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from datetime import date
 from pathlib import Path
+from typing import cast
 
 from delivery_pulse import PROJECT_NAME, __version__
 from delivery_pulse.config import CONFIG
+from delivery_pulse.generation import GenerationConfig, generate_dataset
+from delivery_pulse.generation.pipeline import ExistingDataError
 from delivery_pulse.paths import (
     ProjectPaths,
     create_local_directories,
@@ -37,6 +41,31 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Create local working directories without overwriting their contents.",
     )
     _add_root_argument(init_parser)
+
+    generate_parser = subparsers.add_parser(
+        "generate",
+        help="Generate deterministic synthetic logistics CSV files.",
+    )
+    generate_parser.add_argument("--orders", type=int, default=None)
+    generate_parser.add_argument("--seed", type=int, default=CONFIG.default_seed)
+    generate_parser.add_argument(
+        "--start-date",
+        type=date.fromisoformat,
+        default=date(2024, 1, 1),
+        metavar="YYYY-MM-DD",
+    )
+    generate_parser.add_argument("--months", type=int, default=12)
+    generate_parser.add_argument("--output-dir", type=Path, default=None)
+    generate_parser.add_argument(
+        "--profile",
+        choices=["test", "demo", "full"],
+        default="full",
+    )
+    generate_parser.add_argument(
+        "--inject-quality-issues",
+        action="store_true",
+    )
+    generate_parser.add_argument("--force", action="store_true")
     return parser
 
 
@@ -64,6 +93,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "init":
         paths = create_local_directories(args.root)
         print(f"Local directories are ready under: {paths.root}")
+        return 0
+
+    if args.command == "generate":
+        config = GenerationConfig(
+            profile=args.profile,
+            orders=args.orders,
+            seed=args.seed,
+            start_date=args.start_date,
+            months=args.months,
+            output_dir=args.output_dir,
+            inject_quality_issues=args.inject_quality_issues,
+            force=args.force,
+        )
+        try:
+            result = generate_dataset(config)
+        except (ExistingDataError, ValueError) as error:
+            print(f"Generation failed: {error}", file=sys.stderr)
+            return 2
+        print(f"Generated data: {result.output_dir}")
+        print(f"Metadata: {result.metadata_dir / 'metadata.json'}")
+        row_counts = cast(dict[str, int], result.metadata["row_counts"])
+        for table_name, row_count in row_counts.items():
+            print(f"  {table_name}: {row_count}")
         return 0
 
     raise AssertionError(f"Unsupported command: {args.command}")
