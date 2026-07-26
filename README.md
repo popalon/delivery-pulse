@@ -336,7 +336,49 @@ Windows PowerShell:
 python -m pip install -e ".[dev,notebook]"
 ```
 
+## Бизнес-рекомендации
+
+Этап 7 преобразует сохранённые результаты H1–H6 в evidence-gated карточки,
+сценарии, pilot plans и decision register. Pipeline не строит новых моделей,
+проверяет frozen protocol и не изменяет DuckDB или hypothesis artifacts.
+
+Linux:
+
+```bash
+python -m delivery_pulse recommendations build \
+  --database data/processed/delivery_pulse.duckdb \
+  --hypothesis-results-dir reports/hypotheses \
+  --output-dir reports/recommendations
+```
+
+Windows PowerShell:
+
+```powershell
+python -m delivery_pulse recommendations build `
+  --database data/processed/delivery_pulse.duckdb `
+  --hypothesis-results-dir reports/hypotheses `
+  --output-dir reports/recommendations
+```
+
+Код 0 означает отчёт без insufficient evidence, код 1 — отчёт создан, но часть
+направлений заблокирована недостаточными данными, код 2 — техническую ошибку.
+HOLD не является техническим сбоем. Без `--force` существующие результаты не
+перезаписываются. JSON-файл `--scenario-config` позволяет заменить видимые
+сценарные предположения.
+
+Данные синтетические, результаты наблюдательные, а сценарии имеют маркировку
+`illustrative_scenario_not_forecast`. Окончательные решения требуют pilot на
+реальных данных. Методика и управленческие документы:
+
+- [`docs/recommendation_methodology.md`](docs/recommendation_methodology.md);
+- [`docs/business_recommendations.md`](docs/business_recommendations.md);
+- [`docs/executive_summary.md`](docs/executive_summary.md);
+- [`docs/decision_register.md`](docs/decision_register.md).
+
+Ноутбук `notebooks/04_business_recommendations.ipynb` является тонким
+воспроизводимым представлением функций пакета и не переоценивает гипотезы.
+
 ## Текущий следующий шаг
 
-Этап формальной проверки гипотез завершён. Этап 7 с бизнес-рекомендациями
-начинается только по отдельному разрешению.
+Основные портфолио-этапы 1–7 завершены. PostgreSQL, Metabase, Docker и GitHub
+Actions остаются необязательным этапом 8 и требуют отдельного согласования.

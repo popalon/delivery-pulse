@@ -152,6 +152,25 @@ def _build_parser() -> argparse.ArgumentParser:
         default=["H1", "H2", "H3", "H4", "H5", "H6"],
     )
     run_parser.add_argument("--force", action="store_true")
+
+    recommendations_parser = subparsers.add_parser(
+        "recommendations",
+        help="Build evidence-gated business recommendations.",
+    )
+    recommendation_actions = recommendations_parser.add_subparsers(
+        dest="recommendations_action",
+        required=True,
+    )
+    recommendation_actions.add_parser("info")
+    recommendations_build = recommendation_actions.add_parser("build")
+    recommendations_build.add_argument("--database", type=Path, default=None)
+    recommendations_build.add_argument(
+        "--hypothesis-results-dir", type=Path, default=None
+    )
+    recommendations_build.add_argument("--output-dir", type=Path, default=None)
+    recommendations_build.add_argument("--scenario-config", type=Path, default=None)
+    recommendations_build.add_argument("--top-n", type=int, default=6)
+    recommendations_build.add_argument("--force", action="store_true")
     return parser
 
 
@@ -361,6 +380,53 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Report: {hypothesis_result.output_paths['report']}")
         print(f"Elapsed: {hypothesis_result.elapsed_seconds:.3f} seconds")
         return 1 if hypothesis_result.has_inconclusive else 0
+
+    if args.command == "recommendations":
+        if args.recommendations_action == "info":
+            print("Method: docs/recommendation_methodology.md")
+            print(
+                "Evidence gates: strong, moderate/secondary, descriptive, insufficient"
+            )
+            print("Actions: pilot, monitor, collect_more_data, do_not_act_yet")
+            return 0
+        from delivery_pulse.recommendations import (
+            RecommendationConfig,
+            RecommendationError,
+            run_recommendations,
+        )
+
+        project_paths = get_project_paths()
+        database = (
+            args.database or project_paths.data_processed / "delivery_pulse.duckdb"
+        )
+        hypothesis_dir = (
+            args.hypothesis_results_dir or project_paths.root / "reports" / "hypotheses"
+        )
+        output_dir = (
+            args.output_dir or project_paths.root / "reports" / "recommendations"
+        )
+        try:
+            recommendation_result = run_recommendations(
+                RecommendationConfig(
+                    database=database,
+                    hypothesis_results_dir=hypothesis_dir,
+                    output_dir=output_dir,
+                    scenario_config=args.scenario_config,
+                    top_n=args.top_n,
+                    force=args.force,
+                )
+            )
+        except RecommendationError as error:
+            print(f"Recommendation build failed: {error}", file=sys.stderr)
+            return 2
+        for item in recommendation_result.recommendations:
+            print(
+                f"{item.recommendation_id}: {item.evidence_level}; "
+                f"{item.priority}; {item.action_type}; score={item.priority_score}"
+            )
+        print(f"Report: {recommendation_result.output_paths['report']}")
+        print(f"Elapsed: {recommendation_result.elapsed_seconds:.3f} seconds")
+        return 1 if recommendation_result.has_insufficient_evidence else 0
 
     raise AssertionError(f"Unsupported command: {args.command}")
 
