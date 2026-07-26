@@ -53,6 +53,8 @@ UTC, а бизнес-календарь и отображение использ
 - [Правила контроля качества](docs/data_quality_rules.md)
 - [DuckDB и SQL-слой](docs/warehouse.md)
 - [Выводы EDA и кандидаты гипотез](docs/eda_findings.md)
+- [Протокол проверки гипотез](docs/hypothesis_protocol.md)
+- [Результаты проверки гипотез](docs/hypothesis_results.md)
 - [Правила работы в репозитории](AGENTS.md)
 
 ## Планируемая структура
@@ -288,6 +290,46 @@ python -m delivery_pulse eda `
 построена командой `warehouse build`. Локальные результаты создаются в
 `reports/eda_summary.md` и `reports/figures/eda/` и не добавляются в Git.
 
+## Формальная проверка гипотез
+
+Этап 6 использует заранее зафиксированный protocol, наблюдательные модели,
+95%-доверительные интервалы и Benjamini–Hochberg для шести primary tests.
+Основной анализ предназначен для профиля `full`, 50 000 заказов и seed 42.
+
+Linux:
+
+```bash
+python -m delivery_pulse hypotheses run \
+  --database data/processed/delivery_pulse.duckdb \
+  --output-dir reports/hypotheses \
+  --alpha 0.05 \
+  --seed 42 \
+  --min-group-size 90
+```
+
+Windows PowerShell:
+
+```powershell
+python -m delivery_pulse hypotheses run `
+  --database data/processed/delivery_pulse.duckdb `
+  --output-dir reports/hypotheses `
+  --alpha 0.05 `
+  --seed 42 `
+  --min-group-size 90
+```
+
+`hypotheses info` показывает параметры protocol. Код 0 означает технически
+завершённый анализ без `inconclusive`; код 1 — корректно выполненный анализ, где
+хотя бы одна гипотеза осталась `inconclusive`; код 2 — ошибку запуска.
+`not_supported` не является технической ошибкой.
+
+Данные синтетические, а дизайн наблюдательный: связи не доказывают причинность.
+Результаты зависят от спецификации модели; p-value не является размером эффекта.
+`not_supported` не доказывает отсутствие эффекта, а `inconclusive` не означает
+подтверждение или опровержение. Локальные CSV/JSON/Markdown и PNG исключены из
+Git. Ноутбук `notebooks/03_hypothesis_testing.ipynb` использует функции пакета,
+а не скрытую статистическую логику.
+
 Windows PowerShell:
 
 ```powershell
@@ -296,5 +338,5 @@ python -m pip install -e ".[dev,notebook]"
 
 ## Текущий следующий шаг
 
-Этап EDA завершён. Следующий этап — формальная проверка 4–6 приоритетных
-гипотез; он начинается только по отдельному разрешению.
+Этап формальной проверки гипотез завершён. Этап 7 с бизнес-рекомендациями
+начинается только по отдельному разрешению.

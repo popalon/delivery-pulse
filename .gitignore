@@ -76,6 +76,7 @@ data/metadata/**
 reports/figures/**
 !reports/figures/.gitkeep
 reports/eda_summary.md
+reports/hypotheses/
 reports/tmp/
 
 # Common large data formats outside managed data folders

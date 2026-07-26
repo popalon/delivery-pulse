@@ -130,6 +130,28 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["markdown"],
         default="markdown",
     )
+
+    hypotheses_parser = subparsers.add_parser(
+        "hypotheses",
+        help="Run the pre-registered formal hypothesis protocol.",
+    )
+    hypothesis_actions = hypotheses_parser.add_subparsers(
+        dest="hypotheses_action",
+        required=True,
+    )
+    hypothesis_actions.add_parser("info")
+    run_parser = hypothesis_actions.add_parser("run")
+    run_parser.add_argument("--database", type=Path, default=None)
+    run_parser.add_argument("--output-dir", type=Path, default=None)
+    run_parser.add_argument("--alpha", type=float, default=0.05)
+    run_parser.add_argument("--seed", type=int, default=CONFIG.default_seed)
+    run_parser.add_argument("--min-group-size", type=int, default=90)
+    run_parser.add_argument(
+        "--hypotheses",
+        nargs="+",
+        default=["H1", "H2", "H3", "H4", "H5", "H6"],
+    )
+    run_parser.add_argument("--force", action="store_true")
     return parser
 
 
@@ -295,6 +317,50 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Figures: {len(eda_result.figures)}")
         print(f"Elapsed: {eda_result.elapsed_seconds:.3f} seconds")
         return 0
+
+    if args.command == "hypotheses":
+        if args.hypotheses_action == "info":
+            print("Protocol: docs/hypothesis_protocol.md")
+            print("Primary hypotheses: H1 H2 H3 H4 H5 H6")
+            print("Alpha: 0.05; confidence level: 95%; correction: BH")
+            return 0
+        from delivery_pulse.hypotheses import (
+            HypothesisConfig,
+            HypothesisError,
+            run_hypotheses,
+        )
+
+        project_paths = get_project_paths()
+        database = (
+            args.database or project_paths.data_processed / "delivery_pulse.duckdb"
+        )
+        output_dir = args.output_dir or project_paths.root / "reports" / "hypotheses"
+        try:
+            hypothesis_result = run_hypotheses(
+                HypothesisConfig(
+                    database=database,
+                    output_dir=output_dir,
+                    alpha=args.alpha,
+                    seed=args.seed,
+                    min_group_size=args.min_group_size,
+                    hypotheses=tuple(
+                        hypothesis_id.upper() for hypothesis_id in args.hypotheses
+                    ),
+                    force=args.force,
+                )
+            )
+        except HypothesisError as error:
+            print(f"Hypothesis run failed: {error}", file=sys.stderr)
+            return 2
+        for hypothesis in hypothesis_result.results:
+            print(
+                f"{hypothesis.hypothesis_id}: {hypothesis.status}; "
+                f"n={hypothesis.observations}; events={hypothesis.events}; "
+                f"BH p={hypothesis.p_value_adjusted}"
+            )
+        print(f"Report: {hypothesis_result.output_paths['report']}")
+        print(f"Elapsed: {hypothesis_result.elapsed_seconds:.3f} seconds")
+        return 1 if hypothesis_result.has_inconclusive else 0
 
     raise AssertionError(f"Unsupported command: {args.command}")
 
