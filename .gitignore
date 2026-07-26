@@ -66,14 +66,16 @@ temp/
 data/raw/**
 data/processed/**
 data/marts/**
+data/metadata/**
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/marts/.gitkeep
+!data/metadata/.gitkeep
 reports/figures/**
 !reports/figures/.gitkeep
+reports/tmp/
 
 # Common large data formats outside managed data folders
 *.parquet
 *.feather
 *.arrow
-
