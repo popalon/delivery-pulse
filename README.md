@@ -5,8 +5,9 @@ DeliveryPulse — портфолио-проект по аналитике дан
 или становятся убыточными, найти маршруты, клиентов и процессы с наибольшими
 потерями и сформулировать проверяемые рекомендации.
 
-> Статус: реализованы Python-каркас, генератор, контроль качества и локальный
-> DuckDB warehouse с пятью SQL-витринами. EDA и проверка гипотез ещё не начаты.
+> Статус: реализованы Python-каркас, генератор, контроль качества, локальный
+> DuckDB warehouse и воспроизводимый EDA. Формальная проверка гипотез отложена
+> на следующий этап.
 
 ## Что продемонстрирует проект
 
@@ -51,6 +52,7 @@ UTC, а бизнес-календарь и отображение использ
 - [Сценарии генерации](docs/generation_scenarios.md)
 - [Правила контроля качества](docs/data_quality_rules.md)
 - [DuckDB и SQL-слой](docs/warehouse.md)
+- [Выводы EDA и кандидаты гипотез](docs/eda_findings.md)
 - [Правила работы в репозитории](AGENTS.md)
 
 ## Планируемая структура
@@ -254,6 +256,38 @@ python -m delivery_pulse warehouse baseline `
 создаёт базу. Подробные зерно, lineage и NULL-правила описаны в
 [`docs/warehouse.md`](docs/warehouse.md).
 
+## Разведочный анализ
+
+EDA читает только проверенный DuckDB warehouse, не изменяет базу или raw CSV и
+создаёт Markdown-отчёт с отдельными PNG. Наблюдения относятся к синтетическим
+данным, не являются причинными выводами и не заменяют формальную проверку
+гипотез на этапе 6.
+
+Linux:
+
+```bash
+python -m delivery_pulse eda \
+  --database data/processed/delivery_pulse.duckdb \
+  --output-dir reports \
+  --top-n 10 \
+  --min-group-size 30
+```
+
+Windows PowerShell:
+
+```powershell
+python -m delivery_pulse eda `
+  --database data/processed/delivery_pulse.duckdb `
+  --output-dir reports `
+  --top-n 10 `
+  --min-group-size 30
+```
+
+Полностью воспроизводимый рассказ находится в
+`notebooks/02_exploratory_analysis.ipynb`. Перед его запуском база должна быть
+построена командой `warehouse build`. Локальные результаты создаются в
+`reports/eda_summary.md` и `reports/figures/eda/` и не добавляются в Git.
+
 Windows PowerShell:
 
 ```powershell
@@ -262,5 +296,5 @@ python -m pip install -e ".[dev,notebook]"
 
 ## Текущий следующий шаг
 
-Этап DuckDB и SQL-слоя завершён. Следующий этап — EDA и визуализация; он
-начинается только по отдельному разрешению.
+Этап EDA завершён. Следующий этап — формальная проверка 4–6 приоритетных
+гипотез; он начинается только по отдельному разрешению.

@@ -115,6 +115,21 @@ def _build_parser() -> argparse.ArgumentParser:
     for action in ("validate", "info", "baseline"):
         action_parser = warehouse_actions.add_parser(action)
         action_parser.add_argument("--database", type=Path, default=None)
+
+    eda_parser = subparsers.add_parser(
+        "eda",
+        help="Run reproducible descriptive analysis on a validated warehouse.",
+    )
+    eda_parser.add_argument("--database", type=Path, default=None)
+    eda_parser.add_argument("--output-dir", type=Path, default=None)
+    eda_parser.add_argument("--top-n", type=int, default=10)
+    eda_parser.add_argument("--min-group-size", type=int, default=30)
+    eda_parser.add_argument(
+        "--format",
+        dest="report_format",
+        choices=["markdown"],
+        default="markdown",
+    )
     return parser
 
 
@@ -256,6 +271,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             if "quality" in str(error).lower() or args.warehouse_action == "validate":
                 return 1
             return 2
+
+    if args.command == "eda":
+        from delivery_pulse.analysis import AnalysisError, run_eda
+
+        project_paths = get_project_paths()
+        database = (
+            args.database or project_paths.data_processed / "delivery_pulse.duckdb"
+        )
+        output_dir = args.output_dir or project_paths.root / "reports"
+        try:
+            eda_result = run_eda(
+                database,
+                output_dir,
+                top_n=args.top_n,
+                min_group_size=args.min_group_size,
+                report_format=args.report_format,
+            )
+        except AnalysisError as error:
+            print(f"EDA failed: {error}", file=sys.stderr)
+            return 2
+        print(f"EDA report: {eda_result.report_path}")
+        print(f"Figures: {len(eda_result.figures)}")
+        print(f"Elapsed: {eda_result.elapsed_seconds:.3f} seconds")
+        return 0
 
     raise AssertionError(f"Unsupported command: {args.command}")
 
