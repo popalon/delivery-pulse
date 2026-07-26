@@ -1,0 +1,79 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# IDE and editors
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+.cache/
+
+# Local databases
+*.duckdb
+*.duckdb.wal
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Generated datasets and analytical artifacts
+data/raw/**
+data/processed/**
+data/marts/**
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/marts/.gitkeep
+reports/figures/**
+!reports/figures/.gitkeep
+
+# Common large data formats outside managed data folders
+*.parquet
+*.feather
+*.arrow
+
