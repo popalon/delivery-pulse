@@ -5,8 +5,8 @@ DeliveryPulse — портфолио-проект по аналитике дан
 или становятся убыточными, найти маршруты, клиентов и процессы с наибольшими
 потерями и сформулировать проверяемые рекомендации.
 
-> Статус: реализованы Python-каркас, воспроизводимый генератор и независимая
-> система контроля качества. База, SQL-витрины и анализ ещё не созданы.
+> Статус: реализованы Python-каркас, генератор, контроль качества и локальный
+> DuckDB warehouse с пятью SQL-витринами. EDA и проверка гипотез ещё не начаты.
 
 ## Что продемонстрирует проект
 
@@ -50,6 +50,7 @@ UTC, а бизнес-календарь и отображение использ
 - [Гипотезы](docs/hypotheses.md)
 - [Сценарии генерации](docs/generation_scenarios.md)
 - [Правила контроля качества](docs/data_quality_rules.md)
+- [DuckDB и SQL-слой](docs/warehouse.md)
 - [Правила работы в репозитории](AGENTS.md)
 
 ## Планируемая структура
@@ -208,6 +209,51 @@ Linux:
 python -m pip install -e ".[dev,notebook]"
 ```
 
+## DuckDB warehouse
+
+Сборка запускает quality gate, загружает только восемь ожидаемых CSV и
+атомарно публикует базу после validation. Raw CSV не изменяются, технический
+manifest в базу не загружается.
+
+Linux:
+
+```bash
+python -m delivery_pulse warehouse build \
+  --input-dir data/raw \
+  --database data/processed/delivery_pulse.duckdb
+
+python -m delivery_pulse warehouse validate \
+  --database data/processed/delivery_pulse.duckdb
+
+python -m delivery_pulse warehouse info \
+  --database data/processed/delivery_pulse.duckdb
+
+python -m delivery_pulse warehouse baseline \
+  --database data/processed/delivery_pulse.duckdb
+```
+
+Windows PowerShell:
+
+```powershell
+python -m delivery_pulse warehouse build `
+  --input-dir data/raw `
+  --database data/processed/delivery_pulse.duckdb
+
+python -m delivery_pulse warehouse validate `
+  --database data/processed/delivery_pulse.duckdb
+
+python -m delivery_pulse warehouse info `
+  --database data/processed/delivery_pulse.duckdb
+
+python -m delivery_pulse warehouse baseline `
+  --database data/processed/delivery_pulse.duckdb
+```
+
+Без `--force` существующая база не перезаписывается. `passed_with_warnings`
+разрешает сборку с явным предупреждением, а `failed` возвращает код 1 и не
+создаёт базу. Подробные зерно, lineage и NULL-правила описаны в
+[`docs/warehouse.md`](docs/warehouse.md).
+
 Windows PowerShell:
 
 ```powershell
@@ -216,5 +262,5 @@ python -m pip install -e ".[dev,notebook]"
 
 ## Текущий следующий шаг
 
-Этап контроля качества завершён. Следующий этап — DuckDB и SQL-слой; он
+Этап DuckDB и SQL-слоя завершён. Следующий этап — EDA и визуализация; он
 начинается только по отдельному разрешению.

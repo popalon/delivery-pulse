@@ -157,6 +157,17 @@ def generate_deliveries(
         breakdown_probability = 0.003 + max(km_since_service - 18_000, 0) / 450_000
         if rng.random() < min(breakdown_probability, 0.06):
             breakdown_delay[index] = int(rng.integers(120, 600))
+        if status[index] == "failed" and not any(
+            (
+                loading_delay[index],
+                unloading_delay[index],
+                traffic_delay[index],
+                weather_delay[index],
+                deviation_delay[index],
+                breakdown_delay[index],
+            )
+        ):
+            deviation_delay[index] = int(rng.integers(30, 121))
 
         departure = order.requested_pickup_at + pd.Timedelta(
             minutes=int(loading_delay[index])

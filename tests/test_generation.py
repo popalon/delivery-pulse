@@ -127,6 +127,14 @@ def test_statuses_and_timestamps_are_consistent(tmp_path: Path) -> None:
         (orders["order_status"] == "cancelled")
         & (deliveries["delivery_status"] == "delivered")
     ).any()
+    failed_ids = set(
+        tables["deliveries"].loc[
+            tables["deliveries"]["delivery_status"] == "failed",
+            "delivery_id",
+        ]
+    )
+    documented_ids = set(tables["route_events"]["delivery_id"])
+    assert failed_ids <= documented_ids
 
 
 def test_events_maintenance_and_numeric_ranges(tmp_path: Path) -> None:

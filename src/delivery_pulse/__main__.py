@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
 from datetime import date
@@ -20,6 +21,14 @@ from delivery_pulse.paths import (
 )
 from delivery_pulse.quality import QualityRunError, run_quality
 from delivery_pulse.quality.pipeline import should_fail
+from delivery_pulse.warehouse import (
+    BuildConfig,
+    WarehouseError,
+    build_warehouse,
+    get_baseline_metrics,
+    get_warehouse_info,
+    validate_warehouse,
+)
 
 
 def _add_root_argument(parser: argparse.ArgumentParser) -> None:
@@ -88,6 +97,24 @@ def _build_parser() -> argparse.ArgumentParser:
         default="error",
     )
     quality_parser.add_argument("--max-samples", type=int, default=5)
+
+    warehouse_parser = subparsers.add_parser(
+        "warehouse",
+        help="Build, validate, and inspect the local DuckDB warehouse.",
+    )
+    warehouse_actions = warehouse_parser.add_subparsers(
+        dest="warehouse_action",
+        required=True,
+    )
+    build_parser = warehouse_actions.add_parser("build")
+    build_parser.add_argument("--input-dir", type=Path, default=None)
+    build_parser.add_argument("--database", type=Path, default=None)
+    build_parser.add_argument("--force", action="store_true")
+    build_parser.add_argument("--skip-quality-check", action="store_true")
+    build_parser.add_argument("--allow-warnings", action="store_true")
+    for action in ("validate", "info", "baseline"):
+        action_parser = warehouse_actions.add_parser(action)
+        action_parser.add_argument("--database", type=Path, default=None)
     return parser
 
 
@@ -165,6 +192,70 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(f"Report: {report_paths['markdown']}")
         return 1 if failed else 0
+
+    if args.command == "warehouse":
+        project_paths = get_project_paths()
+        default_database = project_paths.data_processed / "delivery_pulse.duckdb"
+        database = args.database or default_database
+        try:
+            if args.warehouse_action == "build":
+                input_dir = args.input_dir or project_paths.data_raw
+                warehouse_result = build_warehouse(
+                    BuildConfig(
+                        input_dir=input_dir,
+                        database=database,
+                        force=args.force,
+                        skip_quality_check=args.skip_quality_check,
+                        allow_warnings=args.allow_warnings,
+                    )
+                )
+                print(f"Warehouse built: {warehouse_result.database}")
+                print(f"Quality status: {warehouse_result.quality_status}")
+                if (
+                    warehouse_result.quality_status == "passed_with_warnings"
+                    and not args.allow_warnings
+                ):
+                    print(
+                        "Warning: build continued because warnings are "
+                        "non-blocking; review the quality report."
+                    )
+                validation_label = (
+                    "passed" if warehouse_result.validation.passed else "failed"
+                )
+                print(f"Validation: {validation_label}")
+                print(f"Build time: {warehouse_result.elapsed_seconds:.3f} seconds")
+                return 0
+            if args.warehouse_action == "validate":
+                warehouse_report = validate_warehouse(database)
+                for check in warehouse_report.checks:
+                    label = "PASS" if check.passed else "FAIL"
+                    print(f"[{label}] {check.check_id}: {check.message}")
+                return 0 if warehouse_report.passed else 1
+            if args.warehouse_action == "info":
+                print(
+                    json.dumps(
+                        get_warehouse_info(database),
+                        ensure_ascii=False,
+                        indent=2,
+                        default=str,
+                    )
+                )
+                return 0
+            if args.warehouse_action == "baseline":
+                print(
+                    json.dumps(
+                        get_baseline_metrics(database),
+                        ensure_ascii=False,
+                        indent=2,
+                        default=str,
+                    )
+                )
+                return 0
+        except WarehouseError as error:
+            print(f"Warehouse command failed: {error}", file=sys.stderr)
+            if "quality" in str(error).lower() or args.warehouse_action == "validate":
+                return 1
+            return 2
 
     raise AssertionError(f"Unsupported command: {args.command}")
 
