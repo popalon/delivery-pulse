@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "delivery-pulse"
-version = "0.1.0"
+version = "1.0.2"
 description = "A cross-platform analytics portfolio project for synthetic logistics data."
 readme = "README.md"
 requires-python = ">=3.11"
