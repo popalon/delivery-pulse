@@ -1,26 +1,131 @@
 # DeliveryPulse
 
-DeliveryPulse — портфолио-проект по аналитике данных для вымышленной
-логистической компании. Цель проекта — определить, почему доставки опаздывают
-или становятся убыточными, найти маршруты, клиентов и процессы с наибольшими
-потерями и сформулировать проверяемые рекомендации.
+DeliveryPulse — завершённый портфолио-проект аналитики данных вымышленной
+логистической компании. Он воспроизводит полный путь от генерации и контроля
+качества синтетических данных до SQL-витрин, EDA, проверки гипотез и
+evidence-based бизнес-рекомендаций. DuckDB служит источником истины, а
+PostgreSQL и Metabase образуют дополнительный publish- и BI-контур.
 
-> Статус: реализованы Python-каркас, генератор, контроль качества, локальный
-> DuckDB warehouse и воспроизводимый EDA. Формальная проверка гипотез отложена
-> на следующий этап.
+> **Статус:** этапы 1–8 завершены · portfolio release **v1.0.x** · все данные
+> синтетические.
 
-## Что продемонстрирует проект
+## Ключевые возможности
 
-- Python, pandas и NumPy;
-- SQL и DuckDB;
-- Jupyter Notebook;
-- проверку качества данных;
-- проектирование аналитических витрин;
-- проверку бизнес-гипотез;
-- визуализацию и бизнес-интерпретацию;
-- автоматические тесты, Git и документацию.
+- детерминированный генератор связанных логистических данных;
+- независимый data quality pipeline с JSON, CSV и Markdown-отчётами;
+- DuckDB warehouse и пять SQL-витрин с проверенным зерном;
+- воспроизводимые EDA, графики и Jupyter Notebooks;
+- формальная проверка H1–H6 с effect size, 95% CI и диагностикой моделей;
+- evidence-gated рекомендации, pilot plans и decision register;
+- транзакционный optional publish из DuckDB в PostgreSQL;
+- локальный Metabase-контур через Docker Compose;
+- doctor CLI, pytest, Ruff, mypy и GitHub Actions CI.
 
-PostgreSQL, Metabase, Docker Compose и GitHub Actions отложены на будущие этапы.
+## Основные результаты анализа
+
+| Гипотеза | Результат | Интерпретация |
+|---|---|---|
+| H1 — loading delay | `not_supported` | бинарный фактор не поддержан; duration signal остаётся secondary |
+| H2 — express и опоздания | `supported` | связь сохраняется после контроля состава рейсов |
+| H3 — breakdown и убыток | `supported` | поломки связаны с высокой концентрацией убыточных доставок |
+| H4 — обслуживание и поломки | `inconclusive` | текущая модель недостаточно устойчива для изменения интервалов ТО |
+| H5 — клиентская прибыльность | `supported` | различия сохраняются после контроля route и order mix |
+| H6 — операционный перегруз | `inconclusive` | недостаточно событий для надёжного сегментного вывода |
+
+Результаты основаны на синтетических наблюдательных данных. Статистическая
+связь не доказывает причинность, а `not_supported` не доказывает отсутствие
+эффекта.
+
+## Приоритетные рекомендации
+
+- **R1 Express — P1:** ограниченный pilot SLA, планирования ресурсов и
+  маршрутных буферов.
+- **R2 Поломки — P1:** pilot резервирования транспорта, времени реакции и
+  контроля breakdown costs.
+- **R3 Клиенты — P2:** коммерческий review клиентов достаточного объёма с
+  контролем route mix, SLA, retention и маржи.
+
+R5 остаётся направлением сбора данных, а R6 — HOLD без изменения safety limits.
+
+## Архитектура
+
+```mermaid
+flowchart LR
+    A[Synthetic CSV] --> B[Data quality gate]
+    B --> C[DuckDB source tables]
+    C --> D[SQL analytical marts]
+    D --> E[EDA and notebooks]
+    D --> F[Hypothesis testing]
+    E --> G[Business recommendations]
+    F --> G
+    D --> H[PostgreSQL staging]
+    H --> I[Validation and atomic schema swap]
+    I --> J[Metabase dashboards]
+    K[pytest / Ruff / mypy / GitHub Actions] -. validates .-> B
+    K -. validates .-> D
+    K -. validates .-> H
+```
+
+## Быстрый запуск
+
+Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev,notebook]"
+python -m delivery_pulse generate --profile demo --seed 42
+python -m delivery_pulse quality \
+  --input-dir data/raw --output-dir reports/quality
+python -m delivery_pulse warehouse build \
+  --input-dir data/raw \
+  --database data/processed/delivery_pulse.duckdb
+python -m delivery_pulse warehouse validate \
+  --database data/processed/delivery_pulse.duckdb
+python -m delivery_pulse eda \
+  --database data/processed/delivery_pulse.duckdb \
+  --output-dir reports
+```
+
+Эквивалентные команды Windows PowerShell приведены в разделах ниже. Полный
+контур продолжается командами `hypotheses run`, `recommendations build` и,
+опционально, `publish postgres`.
+
+## Основные документы и ноутбуки
+
+- [Техническое задание](PROJECT.md) и [roadmap](ROADMAP.md);
+- [модель данных](docs/data_model.md), [метрики](docs/metrics.md) и
+  [правила качества](docs/data_quality_rules.md);
+- [DuckDB warehouse](docs/warehouse.md) и
+  [результаты EDA](docs/eda_findings.md);
+- [protocol](docs/hypothesis_protocol.md) и
+  [результаты гипотез](docs/hypothesis_results.md);
+- [бизнес-рекомендации](docs/business_recommendations.md) и
+  [executive summary](docs/executive_summary.md);
+- [engineering-контур](docs/engineering.md),
+  [Metabase](docs/metabase.md) и
+  [portfolio walkthrough](docs/portfolio_walkthrough.md);
+- [01 Data Quality](notebooks/01_data_quality.ipynb),
+  [02 EDA](notebooks/02_exploratory_analysis.ipynb),
+  [03 Hypothesis Testing](notebooks/03_hypothesis_testing.ipynb),
+  [04 Recommendations](notebooks/04_business_recommendations.ipynb).
+
+## Ограничения
+
+- используются только синтетические данные без реальных компаний и
+  персональных данных;
+- анализ наблюдательный и не устанавливает причинность;
+- сценарии рекомендаций являются иллюстрациями, а не финансовым прогнозом;
+- PostgreSQL и Metabase — optional publish-слой, DuckDB остаётся source of
+  truth;
+- локальный Compose не заменяет production security, backup, HA и SSO;
+- реальные решения требуют повторной проверки и pilot на корпоративных данных.
+
+## Стек технологий
+
+Python 3.11+, pandas, NumPy, DuckDB, SQL, SciPy, statsmodels, matplotlib,
+Jupyter, pytest, Ruff, mypy, PostgreSQL/psycopg, Metabase, Docker Compose,
+GitHub Actions и Git.
 
 ## Аналитическая идея
 
@@ -33,7 +138,7 @@ PostgreSQL, Metabase, Docker Compose и GitHub Actions отложены на б�
 - техническое обслуживание — состояние автопарка;
 - выручку и затраты — экономику отдельной доставки.
 
-Основные результаты будущего анализа: on-time delivery rate, длительность и
+Основные аналитические показатели: on-time delivery rate, длительность и
 величина опоздания, прибыль и маржа, стоимость километра, простои и надёжность
 автомобилей, включая поломки на 10 000 км и 1 000 часов рейсов.
 
@@ -165,8 +270,8 @@ python -m delivery_pulse generate `
 ## Данные и воспроизводимость
 
 Генератор управляется явным seed и не использует глобальное случайное состояние.
-Сгенерированные датасеты и локальные базы исключены из Git; пользователь сможет
-воспроизвести их локально. Проект не должен содержать секреты или настоящие
+Сгенерированные датасеты и локальные базы исключены из Git и воспроизводятся
+локально. Проект не содержит секреты или настоящие
 данные компаний. Операционные перегрузы анализируются как бизнес-события, а
 намеренные дефекты качества фиксируются в отдельном техническом manifest,
 доступном тестам, но не аналитическому коду.
@@ -383,11 +488,6 @@ HOLD не является техническим сбоем. Без `--force` �
 
 Ноутбук `notebooks/04_business_recommendations.ipynb` является тонким
 воспроизводимым представлением функций пакета и не переоценивает гипотезы.
-
-## Текущий следующий шаг
-
-Основные аналитические этапы 1–7 завершены. Этап 8 добавляет необязательные
-PostgreSQL, Metabase, Docker Compose и GitHub Actions, не заменяя DuckDB.
 
 ## Optional engineering-контур
 
