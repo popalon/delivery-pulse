@@ -32,6 +32,9 @@ notebook = [
     "nbclient>=0.10,<1",
     "nbformat>=5.10,<6",
 ]
+postgres = [
+    "psycopg[binary]>=3.2,<4",
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -42,6 +45,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"
 testpaths = ["tests"]
+markers = [
+    "integration: requires an explicitly configured external test service",
+]
 
 [tool.ruff]
 target-version = "py311"

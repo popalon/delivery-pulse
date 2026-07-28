@@ -124,8 +124,15 @@
 
 ## Этап 8. Усиление инженерного контура
 
-Только после отдельного согласования: PostgreSQL, Metabase, Docker Compose и
-GitHub Actions.
+Результат: необязательный publish- и portfolio-контур без замены DuckDB.
 
-Критерии готовности будут определены перед началом этапа; эти технологии не
-должны становиться обязательными для локального базового сценария.
+Критерии готовности:
+
+- [x] PostgreSQL publication использует staging, validation и rollback;
+- [x] DuckDB остаётся source of truth, raw и manifest не публикуются;
+- [x] Compose описывает локальные PostgreSQL и Metabase без секретов;
+- [x] dashboard SQL использует только publish-витрины;
+- [x] doctor выполняет read-only диагностику;
+- [x] CI запускает unit/static и малый end-to-end smoke;
+- [x] PostgreSQL integration-тесты opt-in и пропускаются без сервиса;
+- [x] portfolio walkthrough документирует решения и ограничения.

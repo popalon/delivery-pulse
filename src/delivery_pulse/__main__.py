@@ -171,6 +171,38 @@ def _build_parser() -> argparse.ArgumentParser:
     recommendations_build.add_argument("--scenario-config", type=Path, default=None)
     recommendations_build.add_argument("--top-n", type=int, default=6)
     recommendations_build.add_argument("--force", action="store_true")
+
+    publish_parser = subparsers.add_parser(
+        "publish", help="Publish validated marts to optional targets."
+    )
+    publish_actions = publish_parser.add_subparsers(
+        dest="publish_action", required=True
+    )
+    postgres_parser = publish_actions.add_parser("postgres")
+    postgres_parser.add_argument("--database", type=Path, default=None)
+    postgres_parser.add_argument("--host", default=None)
+    postgres_parser.add_argument("--port", type=int, default=None)
+    postgres_parser.add_argument("--dbname", default=None)
+    postgres_parser.add_argument("--user", default=None)
+    postgres_parser.add_argument("--password-env", default="POSTGRES_PASSWORD")
+    postgres_parser.add_argument("--schema", default=None)
+    postgres_parser.add_argument(
+        "--mode", choices=["create", "replace"], default="create"
+    )
+    postgres_parser.add_argument("--force", action="store_true")
+    postgres_parser.add_argument("--validate-only", action="store_true")
+
+    doctor_parser = subparsers.add_parser(
+        "doctor", help="Run read-only environment diagnostics."
+    )
+    doctor_parser.add_argument("--database", type=Path, default=None)
+    doctor_parser.add_argument("--check-postgres", action="store_true")
+    doctor_parser.add_argument("--host", default=None)
+    doctor_parser.add_argument("--port", type=int, default=None)
+    doctor_parser.add_argument("--dbname", default=None)
+    doctor_parser.add_argument("--user", default=None)
+    doctor_parser.add_argument("--password-env", default="POSTGRES_PASSWORD")
+    doctor_parser.add_argument("--schema", default=None)
     return parser
 
 
@@ -427,6 +459,90 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Report: {recommendation_result.output_paths['report']}")
         print(f"Elapsed: {recommendation_result.elapsed_seconds:.3f} seconds")
         return 1 if recommendation_result.has_insufficient_evidence else 0
+
+    if args.command == "publish":
+        from delivery_pulse.publish import (
+            PublishConfig,
+            PublishError,
+            load_postgres_config,
+            publish_postgres,
+        )
+        from delivery_pulse.publish.config import PublishConfigError
+
+        paths = get_project_paths()
+        database = args.database or paths.data_processed / "delivery_pulse.duckdb"
+        try:
+            postgres = load_postgres_config(
+                host=args.host,
+                port=args.port,
+                dbname=args.dbname,
+                user=args.user,
+                password_env=args.password_env,
+                schema=args.schema,
+            )
+            publish_result = publish_postgres(
+                PublishConfig(
+                    database=database,
+                    postgres=postgres,
+                    mode=args.mode,
+                    force=args.force,
+                    validate_only=args.validate_only,
+                )
+            )
+        except (PublishConfigError, PublishError) as error:
+            print(f"PostgreSQL publish failed: {error}", file=sys.stderr)
+            return 2
+        print(
+            f"PostgreSQL schema: {publish_result.schema}; "
+            f"mode={publish_result.mode}; "
+            "validation="
+            f"{'passed' if publish_result.validation.passed else 'failed'}"
+        )
+        for table, count in publish_result.table_counts.items():
+            print(f"  {table}: {count}")
+        for validation_check in publish_result.validation.checks:
+            label = "PASS" if validation_check.passed else "FAIL"
+            print(
+                f"[{label}] {validation_check.check_id}: "
+                f"{validation_check.message}; "
+                f"source={validation_check.source_value}; "
+                f"target={validation_check.target_value}"
+            )
+        print(f"Elapsed: {publish_result.elapsed_seconds:.3f} seconds")
+        return 0 if publish_result.validation.passed else 1
+
+    if args.command == "doctor":
+        from delivery_pulse.doctor import run_doctor
+        from delivery_pulse.publish.config import (
+            PublishConfigError,
+            load_postgres_config,
+        )
+
+        doctor_postgres = None
+        if args.check_postgres:
+            try:
+                doctor_postgres = load_postgres_config(
+                    host=args.host,
+                    port=args.port,
+                    dbname=args.dbname,
+                    user=args.user,
+                    password_env=args.password_env,
+                    schema=args.schema,
+                )
+            except PublishConfigError as error:
+                print(f"Doctor configuration error: {error}", file=sys.stderr)
+                return 2
+        checks = run_doctor(
+            database=args.database,
+            check_postgres=args.check_postgres,
+            postgres_config=doctor_postgres,
+        )
+        for doctor_check in checks:
+            print(
+                f"[{doctor_check.status.upper()}] {doctor_check.check_id}: "
+                f"{doctor_check.message}"
+            )
+        return 1 if any(item.status == "fail" for item in checks) else 0
 
     raise AssertionError(f"Unsupported command: {args.command}")
 

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
+      - run: python -m mypy src
+      - run: git diff --check
+      - name: Small end-to-end smoke
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/delivery-pulse/raw"
+          python -m delivery_pulse generate --profile test --orders 100 \
+            --output-dir "$RUNNER_TEMP/delivery-pulse/raw"
+          python -m delivery_pulse quality \
+            --input-dir "$RUNNER_TEMP/delivery-pulse/raw" \
+            --output-dir "$RUNNER_TEMP/delivery-pulse/quality"
+          python -m delivery_pulse warehouse build \
+            --input-dir "$RUNNER_TEMP/delivery-pulse/raw" \
+            --database "$RUNNER_TEMP/delivery-pulse/warehouse.duckdb"
+          python -m delivery_pulse warehouse validate \
+            --database "$RUNNER_TEMP/delivery-pulse/warehouse.duckdb"
+          python -m delivery_pulse eda \
+            --database "$RUNNER_TEMP/delivery-pulse/warehouse.duckdb" \
+            --output-dir "$RUNNER_TEMP/delivery-pulse/eda" \
+            --top-n 5 --min-group-size 5

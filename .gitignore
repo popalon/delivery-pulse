@@ -79,6 +79,11 @@ reports/eda_summary.md
 reports/hypotheses/
 reports/recommendations/
 reports/tmp/
+docker-data/
+postgres-data/
+metabase-data/
+exports/
+container-logs/
 
 # Common large data formats outside managed data folders
 *.parquet

@@ -55,18 +55,24 @@ UTC, а бизнес-календарь и отображение использ
 - [Выводы EDA и кандидаты гипотез](docs/eda_findings.md)
 - [Протокол проверки гипотез](docs/hypothesis_protocol.md)
 - [Результаты проверки гипотез](docs/hypothesis_results.md)
+- [Бизнес-рекомендации](docs/business_recommendations.md)
+- [Engineering-контур](docs/engineering.md)
+- [Metabase](docs/metabase.md)
+- [Portfolio walkthrough](docs/portfolio_walkthrough.md)
 - [Правила работы в репозитории](AGENTS.md)
 
-## Планируемая структура
+## Структура проекта
 
 ```text
 data/       локальные raw-, processed-данные и витрины
 docs/       модель, метрики и гипотезы
 notebooks/  последовательный аналитический рассказ
 reports/    воспроизводимые изображения и итоговые материалы
-sql/        DDL, витрины и аналитические запросы
-src/        переиспользуемый Python-код
-tests/      тесты данных, метрик и витрин
+sql/        DDL, витрины, hypotheses и dashboard-запросы
+src/        генерация, quality, warehouse, analysis, publish и CLI
+tests/      unit, smoke и opt-in integration tests
+.github/    CI без full generation и внешней публикации
+compose.yaml  optional PostgreSQL + Metabase
 ```
 
 Полная структура описана в [PROJECT.md](PROJECT.md).
@@ -380,5 +386,82 @@ HOLD не является техническим сбоем. Без `--force` �
 
 ## Текущий следующий шаг
 
-Основные портфолио-этапы 1–7 завершены. PostgreSQL, Metabase, Docker и GitHub
-Actions остаются необязательным этапом 8 и требуют отдельного согласования.
+Основные аналитические этапы 1–7 завершены. Этап 8 добавляет необязательные
+PostgreSQL, Metabase, Docker Compose и GitHub Actions, не заменяя DuckDB.
+
+## Optional engineering-контур
+
+DuckDB остаётся источником истины. PostgreSQL используется только как
+проверяемый publish-слой для Metabase:
+
+```mermaid
+flowchart LR
+    A[Synthetic CSV] --> B[Quality gate]
+    B --> C[DuckDB source tables]
+    C --> D[SQL marts]
+    D --> E[EDA / hypotheses / recommendations]
+    D --> F[PostgreSQL staging]
+    F --> G[Validation + atomic schema swap]
+    G --> H[Metabase]
+```
+
+Установка optional PostgreSQL extra:
+
+Linux:
+
+```bash
+python -m pip install -e ".[dev,postgres]"
+cp .env.example .env
+python -m delivery_pulse doctor
+docker compose config
+docker compose up -d
+python -m delivery_pulse publish postgres \
+  --database data/processed/delivery_pulse.duckdb \
+  --host localhost --dbname delivery_pulse --user delivery_pulse \
+  --schema delivery_pulse --mode create
+```
+
+Windows PowerShell:
+
+```powershell
+python -m pip install -e ".[dev,postgres]"
+Copy-Item .env.example .env
+python -m delivery_pulse doctor
+docker compose config
+docker compose up -d
+python -m delivery_pulse publish postgres `
+  --database data/processed/delivery_pulse.duckdb `
+  --host localhost --dbname delivery_pulse --user delivery_pulse `
+  --schema delivery_pulse --mode create
+```
+
+Перед Compose-запуском замените example password в локальном `.env`. Пароль не
+передаётся аргументом CLI: publisher читает переменную, имя которой задаётся
+`--password-env`. `replace` требует одновременно `--mode replace --force`.
+`--validate-only` выполняет только сверку опубликованной schema.
+
+Полный путь проекта:
+
+```text
+generate → quality → warehouse build → warehouse validate → eda
+→ hypotheses run → recommendations build → publish postgres → Metabase
+```
+
+Проверки:
+
+```bash
+python -m pytest
+python -m ruff check .
+python -m ruff format --check .
+python -m mypy src
+```
+
+Подробности:
+
+- [engineering architecture](docs/engineering.md);
+- [Metabase setup](docs/metabase.md);
+- [portfolio walkthrough](docs/portfolio_walkthrough.md).
+
+PostgreSQL/Metabase не обязательны для основного локального сценария.
+Синтетические данные, наблюдательные результаты и иллюстративные сценарии не
+заменяют pilot на реальных данных.
